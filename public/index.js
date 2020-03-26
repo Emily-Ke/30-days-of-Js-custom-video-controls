@@ -78,13 +78,24 @@ const progressBar = (videoController) => {
   slider.min = 0;
   slider.value = 0;
   slider.step = 0.01;
+  slider.classList.add('progress-bar');
+  slider.setAttribute('aria-label', 'progress bar');
 
-  videoController.subscribe(['timeupdate'], () => {
+  const setMax = () => {
     if (!slider.max) {
       slider.max = videoController.duration;
     }
+  };
+
+  videoController.subscribe(['timeupdate'], () => {
+    setMax();
     slider.value = videoController.currentTime;
+    slider.style.backgroundImage = `-webkit-gradient(linear, left top, right top, 
+      color-stop(${slider.value / slider.max}, #ffc600), 
+      color-stop(${slider.value / slider.max}, rgba(0, 0, 0, 0))`;
   });
+
+  videoController.subscribe(['durationchange'], setMax);
 
   slider.addEventListener('input', (e) => {
     videoController.currentTime = e.target.value;
@@ -95,11 +106,19 @@ const progressBar = (videoController) => {
 
 const playPauseButton = (videoController) => {
   const button = document.createElement('button');
+  const icon = document.createElement('i');
+  icon.classList.add('fa');
+  button.appendChild(icon);
+
   const setText = () => {
     if (videoController.paused || videoController.ended) {
-      button.textContent = '▶️';
+      icon.classList.add('fa-play');
+      icon.classList.remove('fa-pause');
+      button.setAttribute('aria-label', 'play video');
     } else {
-      button.textContent = '⏸️';
+      icon.classList.add('fa-pause');
+      icon.classList.remove('fa-play');
+      button.setAttribute('aria-label', 'pause video');
     }
   };
   setText();
@@ -111,19 +130,43 @@ const playPauseButton = (videoController) => {
 };
 
 const volume = (videoController) => {
-  const container = document.createDocumentFragment();
+  const container = document.createElement('div');
+  container.classList.add('volume');
+
   const slider = document.createElement('input');
   slider.type = 'range';
   slider.min = 0;
   slider.max = 10;
   slider.value = videoController.volume * 10;
+  slider.setAttribute('aria-label', 'adjust volume');
+
+  const icon = document.createElement('i');
+  icon.classList.add('fa', 'fa-volume-up');
+
+  const setIcon = (vol) => {
+    const numericVolume = Number(vol);
+    const currentIcon = [...icon.classList].find((cls) =>
+      /^fa-volume-\w+$/.test(cls)
+    );
+
+    let newIcon = 'fa-volume-down';
+    if (numericVolume === 0) {
+      newIcon = 'fa-volume-off';
+    } else if (numericVolume > 5) {
+      newIcon = 'fa-volume-up';
+    }
+
+    if (newIcon !== currentIcon) {
+      icon.classList.replace(currentIcon, newIcon);
+    }
+  };
 
   slider.addEventListener('input', (e) => {
     videoController.volume = e.target.value / 10;
+    setIcon(e.target.value);
   });
 
-  container.textContent = '🔈';
-  container.appendChild(slider);
+  container.append(icon, slider);
 
   return container;
 };
@@ -134,6 +177,7 @@ const playbackSpeed = (videoController) => {
   slider.type = 'range';
   slider.min = 0;
   slider.max = playbackRates.length - 1;
+  slider.setAttribute('aria-label', 'adjust playback rate');
 
   slider.value = playbackRates.indexOf(1);
   videoController.playbackRate = 1;
@@ -148,7 +192,14 @@ const playbackSpeed = (videoController) => {
 const skipBackwardButton = (videoController) => {
   const amountToSkip = -10;
   const button = document.createElement('button');
-  button.textContent = `⏪ ${Math.abs(amountToSkip)}s`;
+  button.classList.add('skip');
+  const icon = document.createElement('i');
+  icon.classList.add('fa', 'fa-backward');
+  icon.setAttribute('aria-label', 'skip backward');
+
+  const suffixText = document.createTextNode(` ${Math.abs(amountToSkip)}s`);
+
+  button.append(icon, suffixText);
 
   button.addEventListener('click', () =>
     videoController.offsetCurrentTime(amountToSkip)
@@ -160,7 +211,14 @@ const skipBackwardButton = (videoController) => {
 const skipForwardButton = (videoController) => {
   const amountToSkip = 25;
   const button = document.createElement('button');
-  button.textContent = `${amountToSkip}s ⏩`;
+  button.classList.add('skip');
+  const icon = document.createElement('i');
+  icon.classList.add('fa', 'fa-forward');
+  icon.setAttribute('aria-label', 'skip forward');
+
+  const prefixText = document.createTextNode(`${amountToSkip}s `);
+
+  button.append(prefixText, icon);
 
   button.addEventListener('click', () =>
     videoController.offsetCurrentTime(amountToSkip)
@@ -184,6 +242,7 @@ const buildControls = (videoController) => {
     return li;
   });
   container.append(...controls);
+  container.classList.add('controls');
   return container;
 };
 
@@ -196,12 +255,15 @@ const withCustomControls = (videoElement) => {
   controller.togglePlayPauseOnClick();
 
   const container = document.createElement('div');
-  container.setAttribute('width', videoElement.width);
-  container.setAttribute('height', videoElement.height);
+  container.setAttribute(
+    'style',
+    `width: ${videoElement.width}px; height: ${videoElement.height}px`
+  );
 
   const controls = buildControls(controller);
 
   container.append(videoElement, controls);
+  container.classList.add('video-container');
   return container;
 };
 
